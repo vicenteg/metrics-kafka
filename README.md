@@ -30,7 +30,6 @@ import com.codahale.metrics.jvm.GarbageCollectorMetricSet;
 import com.codahale.metrics.jvm.MemoryUsageGaugeSet;
 
 import io.github.hengyunabc.metrics.KafkaReporter;
-import kafka.producer.ProducerConfig;
 
 public class KafkaReporterSample {
 	static final MetricRegistry metrics = new MetricRegistry();
@@ -77,9 +76,8 @@ public class KafkaReporterSample {
 		props.put("request.required.acks", "1");
 
 		String prefix = "test.";
-		ProducerConfig config = new ProducerConfig(props);
 		KafkaReporter kafkaReporter = KafkaReporter.forRegistry(metrics)
-				.config(config).topic(topic).hostName(hostName).prefix(prefix).build();
+				.props(props).topic(topic).hostName(hostName).prefix(prefix).build();
 
 		kafkaReporter.start(1, TimeUnit.SECONDS);
 
