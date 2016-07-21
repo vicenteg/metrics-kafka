@@ -1,19 +1,19 @@
 package io.github.hengyunabc.metrics;
 
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Properties;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 
+import java.util.Collections;
+import java.util.Properties;
+
+import org.apache.kafka.clients.consumer.ConsumerRecord;
+import org.apache.kafka.clients.consumer.ConsumerRecords;
+import org.apache.kafka.clients.consumer.KafkaConsumer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import kafka.consumer.ConsumerConfig;
-import kafka.consumer.ConsumerIterator;
-import kafka.consumer.KafkaStream;
-import kafka.javaapi.consumer.ConsumerConnector;
+
+import org.apache.kafka.clients.consumer.KafkaConsumer;
 
 public class MetricsKafkaConsumer {
 	private static final Logger logger = LoggerFactory.getLogger(MetricsKafkaConsumer.class);
@@ -26,65 +26,43 @@ public class MetricsKafkaConsumer {
 	int zookeeperSessionTimeoutMs = 4000;
 	int zookeeperSyncTimeMs = 2000;
 	int autoCommitIntervalMs = 1000;
+  int pollTimeout = 5000;
 
 	MessageListener messageListener;
 
-	ConsumerConnector consumer;
-
-	ExecutorService executor;
+	private KafkaConsumer<String,String> consumer;
 
 	@SuppressWarnings("rawtypes")
 	public void init() {
 		Properties props = new Properties();
-		props.put("zookeeper.connect", zookeeper);
+    JsonParser parser = new JsonParser();
+
+    props.put("zookeeper.connect", zookeeper);
 		props.put("group.id", group);
 		props.put("zookeeper.session.timeout.ms", "" + zookeeperSessionTimeoutMs);
 		props.put("zookeeper.sync.time.ms", "" + zookeeperSyncTimeMs);
 		props.put("auto.commit.interval.ms", "" + autoCommitIntervalMs);
 
-		ConsumerConfig config = new ConsumerConfig(props);
+		consumer = new KafkaConsumer<String,String>(props,
+				new org.apache.kafka.common.serialization.StringDeserializer(),
+				new org.apache.kafka.common.serialization.StringDeserializer());
 
-		consumer = kafka.consumer.Consumer.createJavaConsumerConnector(config);
+    consumer.subscribe(Collections.singletonList(topic));
+    ConsumerRecords<String, String> records = consumer.poll(pollTimeout);
 
-		Map<String, Integer> topicCountMap = new HashMap<String, Integer>();
-		topicCountMap.put(topic, threadNumber);
-		Map<String, List<KafkaStream<byte[], byte[]>>> consumerMap = consumer.createMessageStreams(topicCountMap);
-		List<KafkaStream<byte[], byte[]>> streams = consumerMap.get(topic);
-
-		// now launch all the threads
-		//
-		executor = Executors.newFixedThreadPool(threadNumber,
-				new ThreadFactoryBuilder().setNameFormat("kafka-metrics-consumer-%d").build());
-
-		for (final KafkaStream stream : streams) {
-			executor.submit(new Runnable() {
-				@SuppressWarnings("unchecked")
-				@Override
-				public void run() {
-
-					ConsumerIterator<byte[], byte[]> it = stream.iterator();
-					while (it.hasNext()) {
-						try {
-							messageListener.onMessage(new String(it.next().message()));
-						} catch (RuntimeException e) {
-							logger.error("consumer kafka metrics message error!", e);
-						}
-					}
-				}
-			});
-		}
-
+    for (ConsumerRecord<String, String> record : records) {
+      JsonObject o = parser.parse(record.value()).getAsJsonObject();
+      messageListener.onMessage(o.getAsString());
+    }
 	}
 
-	public void desotry() {
+	public void destroy() {
 		try {
 			if (consumer != null) {
-				consumer.shutdown();
+				consumer.close();
 			}
 		} finally {
-			if (executor != null) {
-				executor.shutdown();
-			}
+
 		}
 	}
 

@@ -11,8 +11,6 @@ public class MetricsKafkaConsumerSample {
 	String topic;
 	String group;
 
-	MetricsKafkaConsumer consumer;
-
 	public static void main(String[] args) throws IOException {
 
 		String zookeeper = "localhost:2181";
@@ -36,7 +34,6 @@ public class MetricsKafkaConsumerSample {
 
 		System.in.read();
 
-		consumer.desotry();
+		consumer.destroy();
 	}
-
 }

@@ -3,11 +3,13 @@ package io.github.hengyunabc.metrics;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Properties;
 import java.util.SortedMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
+import org.apache.kafka.clients.producer.KafkaProducer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -22,14 +24,13 @@ import com.codahale.metrics.Timer;
 import com.codahale.metrics.json.MetricsModule;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
-import kafka.javaapi.producer.Producer;
-import kafka.producer.KeyedMessage;
-import kafka.producer.ProducerConfig;
+import org.apache.kafka.clients.producer.Producer;
+import org.apache.kafka.clients.producer.ProducerRecord;
 
 /**
- * 
+ *
  * @author hengyunabc
- * 
+ *
  *
  */
 public class KafkaReporter extends ScheduledReporter {
@@ -37,34 +38,36 @@ public class KafkaReporter extends ScheduledReporter {
 			.getLogger(KafkaReporter.class);
 
 	String topic;
-	ProducerConfig config;
 	Producer<String, String> producer;
 	ExecutorService kafkaExecutor;
 
 	private String prefix;
 	private String hostName;
 	private String ip;
+	private Properties props;
 
 	int count = 0;
-	
+
 	ObjectMapper mapper;
 
 	private KafkaReporter(MetricRegistry registry, String name,
 			TimeUnit rateUnit, TimeUnit durationUnit, boolean showSamples, MetricFilter filter,
-			String topic, ProducerConfig config, String prefix,
+			String topic,  Properties props, String prefix,
 			String hostName, String ip) {
 		super(registry, name, filter, rateUnit, durationUnit);
 		this.topic = topic;
-		this.config = config;
 		this.prefix = prefix;
 		this.hostName = hostName;
+		this.props = props;
 		this.ip = ip;
-		
+
 		this.mapper = new ObjectMapper().registerModule(new MetricsModule(rateUnit,
                 durationUnit,
                 showSamples));
 
-		producer = new Producer<String, String>(config);
+		producer = new KafkaProducer<String, String>(props,
+				new org.apache.kafka.common.serialization.StringSerializer(),
+				new org.apache.kafka.common.serialization.StringSerializer());
 
 		kafkaExecutor = Executors
 				.newSingleThreadExecutor(new ThreadFactoryBuilder()
@@ -80,17 +83,16 @@ public class KafkaReporter extends ScheduledReporter {
 		private String name = "kafka-reporter";
 		private TimeUnit rateUnit;
 		private TimeUnit durationUnit;
-		
+
 		private boolean showSamples;
-		
+
 		private MetricFilter filter;
-		
+
 		private String prefix = "";
 		private String hostName;
 		private String ip;
-
+		private Properties props;
 		private String topic;
-		private ProducerConfig config;
 
 		public Builder(MetricRegistry registry) {
 			this.registry = registry;
@@ -123,7 +125,7 @@ public class KafkaReporter extends ScheduledReporter {
 			this.durationUnit = durationUnit;
 			return this;
 		}
-		
+
 		public Builder showSamples(boolean showSamples) {
 			this.showSamples = showSamples;
 			return this;
@@ -143,7 +145,7 @@ public class KafkaReporter extends ScheduledReporter {
 
 		/**
 		 * default register name is "kafka-reporter".
-		 * 
+		 *
 		 * @param name
 		 * @return
 		 */
@@ -157,8 +159,8 @@ public class KafkaReporter extends ScheduledReporter {
 			return this;
 		}
 
-		public Builder config(ProducerConfig config) {
-			this.config = config;
+		public Builder props(Properties props) {
+			this.props = props;
 			return this;
 		}
 
@@ -176,7 +178,7 @@ public class KafkaReporter extends ScheduledReporter {
 			this.ip = ip;
 			return this;
 		}
-		
+
 		/**
 		 * Builds a {@link KafkaReporter} with the given properties.
 		 *
@@ -193,7 +195,7 @@ public class KafkaReporter extends ScheduledReporter {
 			}
 
 			return new KafkaReporter(registry, name, rateUnit, durationUnit, showSamples,
-					filter, topic, config, prefix, hostName, ip);
+					filter, topic, props, prefix, hostName, ip);
 		}
 	}
 
@@ -211,27 +213,27 @@ public class KafkaReporter extends ScheduledReporter {
 			SortedMap<String, Counter> counters,
 			SortedMap<String, Histogram> histograms,
 			SortedMap<String, Meter> meters, SortedMap<String, Timer> timers) {
-		
+
 		final Map<String, Object> result = new HashMap<String, Object>(16);
-		
+
 		result.put("hostName", hostName);
 		result.put("ip", ip);
 		result.put("rateUnit", getRateUnit());
 		result.put("durationUnit", getDurationUnit());
-		
+
 		result.put("gauges", addPrefix(gauges));
 		result.put("counters", addPrefix(counters));
 		result.put("histograms", addPrefix(histograms));
 		result.put("meters", addPrefix(meters));
 		result.put("timers", addPrefix(timers));
-		
+
 		result.put("clock", System.currentTimeMillis());
-		
+
 		kafkaExecutor.execute(new Runnable() {
 			@Override
 			public void run() {
 				try {
-				KeyedMessage<String, String> message = new KeyedMessage<String, String>(
+				ProducerRecord<String, String> message = new ProducerRecord<String,String>(
 						topic, "" + count++, mapper.writeValueAsString(result));
 					producer.send(message);
 				} catch (Exception e) {
