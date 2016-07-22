@@ -1,5 +1,4 @@
 package io.github.hengyunabc.metrics.test;
-
 import java.io.IOException;
 import java.util.Properties;
 import java.util.Timer;
@@ -19,8 +18,7 @@ public class KafkaReporterSample {
 	static final MetricRegistry metrics = new MetricRegistry();
 	static public Timer timer = new Timer();
 
-	public static void main(String args[]) throws IOException,
-			InterruptedException {
+	public static void main(String args[]) throws IOException, InterruptedException {
 		ConsoleReporter reporter = ConsoleReporter.forRegistry(metrics)
 				.convertRatesTo(TimeUnit.SECONDS)
 				.convertDurationsTo(TimeUnit.MILLISECONDS).build();
@@ -46,7 +44,6 @@ public class KafkaReporterSample {
 				responseSizes.update(i++);
 				context.stop();
 			}
-
 		}, 1000, 1000);
 
 		reporter.start(5, TimeUnit.SECONDS);
@@ -54,17 +51,13 @@ public class KafkaReporterSample {
 		String hostName = "localhost";
 		String topic = "test-kafka-reporter";
 		Properties props = new Properties();
-		props.put("metadata.broker.list", "127.0.0.1:9092");
-		props.put("serializer.class", "kafka.serializer.StringEncoder");
-		props.put("partitioner.class", "kafka.producer.DefaultPartitioner");
-		props.put("request.required.acks", "1");
+		props.put("bootstrap.servers", "localhost:9092");
+		props.put("acks", "all");
 
 		String prefix = "test.";
 		KafkaReporter kafkaReporter = KafkaReporter.forRegistry(metrics)
 				.props(props).topic(topic).hostName(hostName).prefix(prefix).build();
 
 		kafkaReporter.start(1, TimeUnit.SECONDS);
-
-		TimeUnit.SECONDS.sleep(500);
 	}
 }

@@ -34,7 +34,6 @@ public class SpringTest {
 		String hostName = "192.168.66.30";
 		String topic = "test-kafka-reporter";
 		Properties props = new Properties();
-		props.put("request.required.acks", "1");
 		props.put("bootstrap.servers", "localhost:9092");
 
 		String prefix = "test.";
@@ -49,10 +48,8 @@ public class SpringTest {
 		Thread t = new Thread(new Runnable() {
 			@Override
 			public void run() {
-				while (true) {
 					annotationObject.call();
 					annotationObject.userLogin();
-				}
 			}
 		});
 		t.start();
