@@ -1,8 +1,5 @@
 package io.github.hengyunabc.metrics;
 
-import com.google.gson.JsonObject;
-import com.google.gson.JsonParser;
-
 import java.util.Collections;
 import java.util.Properties;
 
@@ -35,7 +32,6 @@ public class MetricsKafkaConsumer {
 	@SuppressWarnings("rawtypes")
 	public void init() {
 		Properties props = new Properties();
-    JsonParser parser = new JsonParser();
 
     props.put("zookeeper.connect", zookeeper);
 		props.put("group.id", group);
@@ -51,8 +47,7 @@ public class MetricsKafkaConsumer {
     ConsumerRecords<String, String> records = consumer.poll(pollTimeout);
 
     for (ConsumerRecord<String, String> record : records) {
-      JsonObject o = parser.parse(record.value()).getAsJsonObject();
-      messageListener.onMessage(o.getAsString());
+      messageListener.onMessage(record.value());
     }
 	}
 
